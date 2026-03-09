@@ -30,7 +30,28 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             seen.add(link)
             records.append(f"{user} | {link}")  # 保存记录
             logging.info(f"记录：{user} | {link}")  # 输出日志，方便调试
-            await update.message.reply_text(f"已记录: {user} | {link}")  # 给出反馈
+            
+            # 创建内联按钮
+            keyboard = [
+                [InlineKeyboardButton("导出链接", callback_data='export_links')]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            # 发送带有按钮的消息
+            await update.message.reply_text(f"已记录: {user} | {link}", reply_markup=reply_markup)  # 给出反馈
+
+# 处理按钮点击事件
+async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == 'export_links':
+        if not records:
+            await query.edit_message_text(text="暂无记录！")
+            return
+
+        result = "\n".join(records)  # 格式化记录内容
+        await query.edit_message_text(text=f"导出的链接:\n{result}")
 
 # 创建清空链接按钮
 async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -41,8 +62,8 @@ async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text('你确定要清空所有链接吗？', reply_markup=reply_markup)
 
-# 处理按钮点击事件
-async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# 处理清空链接按钮点击事件
+async def clear_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
@@ -50,22 +71,6 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         records.clear()  # 清空记录
         seen.clear()  # 清空去重集合
         await query.edit_message_text(text="所有链接已清空！")  # 更新消息文本
-    elif query.data == 'export_links':
-        if not records:
-            await query.edit_message_text(text="暂无记录！")
-            return
-
-        result = "\n".join(records)  # 格式化记录内容
-        await query.edit_message_text(text=f"导出的链接:\n{result}")
-
-# 创建导出链接按钮
-async def export(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        [InlineKeyboardButton("导出链接", callback_data='export_links')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    await update.message.reply_text('点击下面的按钮导出所有链接:', reply_markup=reply_markup)
 
 # 设置 Telegram Bot 应用
 app = ApplicationBuilder().token("8413005679:AAHLbUiaMFjWm-nQtwKxIcliTyo5vZIkjZw").build()
@@ -73,8 +78,8 @@ app = ApplicationBuilder().token("8413005679:AAHLbUiaMFjWm-nQtwKxIcliTyo5vZIkjZw
 # 绑定处理函数
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))  # 处理群消息
 app.add_handler(CommandHandler("clear", clear))  # 处理 /clear 命令
-app.add_handler(CommandHandler("export", export))  # 处理 /export 命令
-app.add_handler(CallbackQueryHandler(button))  # 处理按钮点击
+app.add_handler(CallbackQueryHandler(button))  # 处理导出按钮点击事件
+app.add_handler(CallbackQueryHandler(clear_button))  # 处理清空链接按钮点击事件
 
 # 启动机器人
 print("Bot running...")
