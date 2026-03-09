@@ -53,8 +53,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # 创建内联按钮
         keyboard = [
-            [InlineKeyboardButton("导出链接", callback_data='export_links')],
-            [InlineKeyboardButton("复制链接", callback_data='copy_links')]
+            [InlineKeyboardButton("导出链接", callback_data='export_links')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -134,6 +133,10 @@ async def clear_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 清空数据库中的记录
         cursor.execute("DELETE FROM links")
         conn.commit()
+
+        # 清空 seen 集合，防止重新添加已删除的链接
+        seen.clear()
+
         await query.edit_message_text(text="所有链接已清空！")  # 更新消息文本
 
 # 创建 /help 命令
@@ -143,15 +146,14 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     1. 发送 WhatsApp 群链接，机器人会自动记录并反馈。
     2. 点击“导出链接”按钮，可以查看所有记录的链接。
-    3. 点击“复制所有链接”按钮，将显示所有链接，您可以复制它们。
-    4. 输入 /clear 清空所有记录。
-    5. 点击“确认清空链接”按钮，可以确认清空所有链接。
-    6. 每条记录旁边有一个“删除链接”按钮，您可以删除单个链接。
+    3. 输入 /clear 清空所有记录。
+    4. 点击“确认清空链接”按钮，可以确认清空所有链接。
+    5. 每条记录旁边有一个“删除链接”按钮，您可以删除单个链接。
     """
     await update.message.reply_text(help_text)
 
 # 设置 Telegram Bot 应用
-app = ApplicationBuilder().token("8413005679:AAHLbUiaMFjWm-nQtwKxIcliTyo5vZIkjZw").build()
+app = ApplicationBuilder().token("你的BOT_TOKEN").build()
 
 # 绑定处理函数
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))  # 处理群消息
