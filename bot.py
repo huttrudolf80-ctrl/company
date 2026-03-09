@@ -1,38 +1,30 @@
 import re
 import logging
+import sqlite3
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, CommandHandler, CallbackQueryHandler, ContextTypes
-import logging
 
-# 启用日志记录，方便调试
+# 设置日志记录
 logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
 
-# 用于存储记录的列表
-records = []
+# 创建数据库连接（确保数据库文件路径是正确的）
+conn = sqlite3.connect('/app/data/whatsapp_links.db')  # 修改为持久化存储路径
+cursor = conn.cursor()
+
+# 创建表格（如果表格已存在，则跳过创建）
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS links (
+    user TEXT,
+    link TEXT
+)
+''')
+conn.commit()
+
 # 用于去重链接的集合
 seen = set()
 
 # 正则表达式：用于匹配 WhatsApp 群链接
 pattern = r"https://chat\.whatsapp\.com/[A-Za-z0-9]+"
-
-# 设置日志记录
-logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
-
-# 错误处理装饰器
-def handle_error(func):
-    async def wrapper(update, context):
-        try:
-            await func(update, context)
-        except Exception as e:
-            logging.error(f"发生错误: {e}")
-            await update.message.reply_text(f"发生错误：{e}")
-    return wrapper
-
-# 处理消息的函数添加错误处理
-@handle_error
-async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # 你的消息处理代码...
-    pass
 
 # 处理收到的消息
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -48,9 +40,12 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for link in links:
         if link not in seen:  # 如果该链接尚未记录
             seen.add(link)
-            records.append(f"{user} | {link}")  # 保存记录
-            logging.info(f"记录：{user} | {link}")  # 输出日志，方便调试
             
+            # 插入链接到数据库
+            cursor.execute("INSERT INTO links (user, link) VALUES (?, ?)", (user, link))
+            conn.commit()
+            logging.info(f"记录：{user} | {link}")  # 输出日志，方便调试
+
             # 创建内联按钮
             keyboard = [
                 [InlineKeyboardButton("导出链接", callback_data='export_links')],
@@ -67,11 +62,15 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     if query.data == 'export_links':
+        # 从数据库获取所有记录
+        cursor.execute("SELECT user, link FROM links")
+        records = cursor.fetchall()
+
         if not records:
             await query.edit_message_text(text="暂无记录！")
             return
 
-        result = "\n".join(records)  # 格式化记录内容
+        result = "\n".join([f"{user} | {link}" for user, link in records])  # 格式化记录内容
         await query.edit_message_text(text=f"导出的链接:\n{result}")
 
         # 添加“复制链接”按钮
@@ -84,28 +83,19 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(text=f"导出的链接:\n{result}", reply_markup=reply_markup)
 
     elif query.data == 'copy_links':
+        # 从数据库获取所有记录
+        cursor.execute("SELECT user, link FROM links")
+        records = cursor.fetchall()
+
         if not records:
             await query.edit_message_text(text="暂无记录！")
             return
 
-        result = "\n".join(records)  # 获取所有记录的链接
+        result = "\n".join([f"{user} | {link}" for user, link in records])  # 获取所有记录的链接
         await query.edit_message_text(text=f"复制下面的链接:\n\n{result}")
 
         # 提示用户“复制完成”
         await query.answer("所有链接已显示，您可以复制它们！")
-        
-# 创建帮助信息
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    help_text = """
-    欢迎使用 WhatsApp 链接记录机器人！
-
-    1. 发送 WhatsApp 群链接，机器人会自动记录并反馈。
-    2. 点击“导出链接”按钮，可以查看所有记录的链接。
-    3. 点击“复制所有链接”按钮，将显示所有链接，您可以复制它们。
-    4. 输入 /clear 清空所有记录。
-    5. 点击“确认清空链接”按钮，可以确认清空所有链接。
-    """
-    await update.message.reply_text(help_text)
 
 # 创建清空链接按钮
 async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -122,29 +112,19 @@ async def clear_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     if query.data == 'confirm_clear_links':
-        records.clear()  # 清空记录
-        seen.clear()  # 清空去重集合
-        await query.edit_message_text(text="所有链接已清空！")  # 更新消息文本
-
-# 处理清空链接按钮点击事件
-async def clear_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    if query.data == 'clear_links':
-        records.clear()  # 清空记录
-        seen.clear()  # 清空去重集合
+        # 清空数据库中的记录
+        cursor.execute("DELETE FROM links")
+        conn.commit()
         await query.edit_message_text(text="所有链接已清空！")  # 更新消息文本
 
 # 设置 Telegram Bot 应用
-app = ApplicationBuilder().token("8413005679:AAHLbUiaMFjWm-nQtwKxIcliTyo5vZIkjZw").build()
+app = ApplicationBuilder().token("你的BOT_TOKEN").build()
 
 # 绑定处理函数
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))  # 处理群消息
 app.add_handler(CommandHandler("clear", clear))  # 处理 /clear 命令
 app.add_handler(CallbackQueryHandler(button))  # 处理导出按钮点击事件
 app.add_handler(CallbackQueryHandler(clear_button))  # 处理清空链接按钮点击事件
-app.add_handler(CommandHandler("help", help_command)) # 绑定 /help 命令
 
 # 启动机器人
 print("Bot running...")
