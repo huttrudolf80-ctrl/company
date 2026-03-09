@@ -68,7 +68,7 @@ async def export(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text('点击下面的按钮导出所有链接:', reply_markup=reply_markup)
 
 # 设置 Telegram Bot 应用
-app = ApplicationBuilder().token("你的BOT_TOKEN").build()
+app = ApplicationBuilder().token("8413005679:AAHLbUiaMFjWm-nQtwKxIcliTyo5vZIkjZw").build()
 
 # 绑定处理函数
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))  # 处理群消息
