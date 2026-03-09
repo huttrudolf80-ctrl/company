@@ -6,4 +6,4 @@ app = Flask('')
 def home():
   return "Bot active"
 
-app.run(host="0.0.0.0", port=3000)
+app.run(host="0.0.0.0", port=5000)
