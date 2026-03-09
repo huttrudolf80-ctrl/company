@@ -151,7 +151,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(help_text)
 
 # 设置 Telegram Bot 应用
-app = ApplicationBuilder().token("你的BOT_TOKEN").build()
+app = ApplicationBuilder().token("8413005679:AAHLbUiaMFjWm-nQtwKxIcliTyo5vZIkjZw").build()
 
 # 绑定处理函数
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))  # 处理群消息
