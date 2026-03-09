@@ -33,7 +33,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # 创建内联按钮
             keyboard = [
-                [InlineKeyboardButton("导出链接", callback_data='export_links')]
+                [InlineKeyboardButton("导出链接", callback_data='export_links')],
+                [InlineKeyboardButton("复制链接", callback_data='copy_links')]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -52,6 +53,26 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         result = "\n".join(records)  # 格式化记录内容
         await query.edit_message_text(text=f"导出的链接:\n{result}")
+
+        # 添加“复制链接”按钮
+        keyboard = [
+            [InlineKeyboardButton("复制所有链接", callback_data='copy_links')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        # 更新消息，显示复制链接按钮
+        await query.edit_message_text(text=f"导出的链接:\n{result}", reply_markup=reply_markup)
+
+    elif query.data == 'copy_links':
+        if not records:
+            await query.edit_message_text(text="暂无记录！")
+            return
+
+        result = "\n".join(records)  # 获取所有记录的链接
+        await query.edit_message_text(text=f"复制下面的链接:\n\n{result}")
+
+        # 提示用户“复制完成”
+        await query.answer("所有链接已复制到剪贴板！")
 
 # 创建清空链接按钮
 async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
