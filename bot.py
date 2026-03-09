@@ -14,10 +14,10 @@ cursor = conn.cursor()
 # 创建表格（如果表格已存在，则跳过创建）
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS links (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,  # 添加 ID 字段，自动递增
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     user TEXT,
     link TEXT,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP  # 添加时间戳
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
 )
 ''')
 conn.commit()
@@ -68,37 +68,53 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     if query.data == 'export_links':
-        # 从数据库获取所有记录，并按时间戳升序排序
-        cursor.execute("SELECT user, link FROM links ORDER BY timestamp ASC")
+        # 从数据库获取所有记录，并按用户和时间戳升序排序
+        cursor.execute("SELECT user, link FROM links ORDER BY user, timestamp ASC")
         records = cursor.fetchall()
 
         if not records:
             await query.edit_message_text(text="暂无记录！")
             return
 
-        # 显示所有链接并为每条链接添加删除按钮
-        result = ""
+        # 将记录按用户分组
+        grouped_records = {}
         for user, link in records:
-            result += f"{user} | {link}\n"
-            # 创建删除按钮（将 ID 作为 callback_data）
+            if user not in grouped_records:
+                grouped_records[user] = []
+            grouped_records[user].append(link)
+
+        # 构建显示结果，每个用户的记录按时间升序排列
+        result = ""
+        for user, links in grouped_records.items():
+            result += f"\n{user} 的群链接:\n"
+            for link in links:
+                result += f"{link}\n"
+            
+            # 为每条记录添加删除按钮
             keyboard = [
-                [InlineKeyboardButton("删除链接", callback_data=f'delete_{link}')]
+                [InlineKeyboardButton("删除链接", callback_data=f'delete_{user}_{link}')]
+                for link in links
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            # 发送每条记录，并附带删除按钮
-            await query.edit_message_text(text=f"导出的链接:\n{result}", reply_markup=reply_markup)
+
+            # 发送每个用户的记录
+            await query.edit_message_text(text=f"{result}", reply_markup=reply_markup)
 
     elif query.data.startswith('delete_'):
-        link = query.data.split('_')[1]
+        # 提取要删除的记录信息（包括用户和链接）
+        parts = query.data.split('_')
+        user = parts[1]
+        link = parts[2]
 
         # 从数据库删除对应记录
-        cursor.execute("DELETE FROM links WHERE link = ?", (link,))
+        cursor.execute("DELETE FROM links WHERE user = ? AND link = ?", (user, link))
         conn.commit()
 
         await query.edit_message_text(text="链接已删除！")
 
         # 更新记录
         await button(update, context)
+
 
 # 创建清空链接按钮
 async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
